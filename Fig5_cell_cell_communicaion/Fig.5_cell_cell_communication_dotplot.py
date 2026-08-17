@@ -7,18 +7,18 @@ import pandas as pd
 from matplotlib.colors import TwoSlopeNorm
 
 
-# ---------- 请在这里修改路径 ----------
+
 INPUT_CSV = Path("your/path/to/CCC_Statistics_Results_all.csv")
 OUTPUT_DIR = Path("your/path/to/output")
-# -------------------------------------
 
-# 需要展示的靶细胞及其来源方向
+
+
 TARGETS = {
     "Beta": ["PeriMac->Beta", "IntraMac->Beta"],
     "Alpha": ["PeriMac->Alpha", "IntraMac->Alpha"],
 }
 
-# 比较组配置：p 值列名、log2FC 列名、图标题
+
 COMPARISONS = {
     "Ctrl_vs_Obesity": {
         "p_col": "P_Obesity_vs_Ctrl",
@@ -32,13 +32,13 @@ COMPARISONS = {
     },
 }
 
-# 显著性阈值 & 各方向上调 / 下调分别保留的 Top N 数量
+
 P_THRESHOLD = 0.05
 TOP_N_LIST = [10, 15, 20]
 
 
 def safe_name(value: str) -> str:
-    """将字符串中的特殊字符替换为文件名安全的等价形式。"""
+
     return (
         str(value)
         .replace("->", "_to_")
@@ -49,7 +49,7 @@ def safe_name(value: str) -> str:
 
 
 def load_data():
-    """读取并预处理 CCC 统计结果 CSV。"""
+
     df = pd.read_csv(INPUT_CSV)
 
     required = {"Direction", "LR_Pair"}
@@ -58,13 +58,13 @@ def load_data():
         required.add(config["logfc_col"])
     missing = sorted(required - set(df.columns))
     if missing:
-        raise ValueError(f"CSV 缺少以下必需列: {missing}")
+        raise ValueError(f"CSV : {missing}")
 
     for config in COMPARISONS.values():
         df[config["p_col"]] = pd.to_numeric(df[config["p_col"]], errors="coerce")
         df[config["logfc_col"]] = pd.to_numeric(df[config["logfc_col"]], errors="coerce")
 
-    # 过滤错误配对的 FGF-FGFR 组合
+ 
     before = len(df)
     df = df[~df["LR_Pair"].str.contains("FGF.*FGFR|FGFR.*FGF", case=True, na=False)]
     print(f"Filtered FGF-FGFR pairs: {before} -> {len(df)} rows")
@@ -72,11 +72,7 @@ def load_data():
 
 
 def build_plot_frame(df, directions, p_col, logfc_col, p_threshold, top_n):
-    """
-    按给定方向、P 值阈值和 Top N 筛选绘图数据。
-    每个方向内分别取 top_n 上调和 top_n 下调，
-    同一 LR_Pair 在多个方向中出现时共享同一行。
-    """
+
     data = df[df["Direction"].isin(directions)].copy()
     data = data.dropna(subset=[p_col, logfc_col])
     data = data[data[p_col] < p_threshold].copy()
@@ -87,7 +83,7 @@ def build_plot_frame(df, directions, p_col, logfc_col, p_threshold, top_n):
     data["Regulation"] = np.where(data[logfc_col] > 0, "Up", "Down")
     selected_frames = []
 
-    # 每个方向内分别取 top N 上调和下调
+
     for direction in directions:
         dir_data = data[data["Direction"] == direction]
         if dir_data.empty:
@@ -130,7 +126,6 @@ def build_plot_frame(df, directions, p_col, logfc_col, p_threshold, top_n):
     if data.empty:
         return data
 
-    # Y 轴行顺序：先 Up 后 Down，每个区块内按跨方向最大 |log2FC| 排序
     row_order = []
     for regulation, ascending in [("Up", False), ("Down", True)]:
         block = data[data["Regulation"] == regulation]
@@ -152,7 +147,7 @@ def build_plot_frame(df, directions, p_col, logfc_col, p_threshold, top_n):
 
 def plot_dotplot(data, directions, target, comparison_title,
                  p_col, logfc_col, p_threshold, top_n, output_path):
-    """绘制上调 / 下调分区 dotplot，包含 log2FC colorbar。"""
+
     pair_count = data["Row_ID"].nunique() if not data.empty else 1
     fig_height = max(5.2, 0.23 * pair_count + 2.4)
     fig, ax = plt.subplots(figsize=(4.1, fig_height))
@@ -166,7 +161,7 @@ def plot_dotplot(data, directions, target, comparison_title,
         y_labels = [v.split("::", 1)[1] for v in y_categories]
         up_count = sum(v.startswith("Up::") for v in y_categories)
 
-        # 在 Up 和 Down 区块之间留空隙
+
         gap = 1.2 if up_count > 0 and len(y_categories) > up_count else 0.0
         y_positions = {}
         for i, pair in enumerate(y_categories):
@@ -195,7 +190,7 @@ def plot_dotplot(data, directions, target, comparison_title,
         ax.set_ylim(-0.6, max(y_positions.values()) + 0.6)
         ax.grid(False)
 
-        # 网格线
+
         for xb in np.arange(-0.5, len(directions) + 0.5, 1):
             ax.axvline(xb, color="0.25", linewidth=0.9, zorder=0)
         for i, pair in enumerate(y_categories):
@@ -231,7 +226,6 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     df = load_data()
 
-    # 检查必需的方向是否存在
     for target, directions in TARGETS.items():
         available = sorted(set(directions) & set(df["Direction"]))
         if len(available) != len(directions):
